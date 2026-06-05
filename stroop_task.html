@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stroop Task Experiment</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+#app { width: 100%; max-width: 620px; }
+.screen { display: none; flex-direction: column; align-items: center; gap: 1.5rem; }
+.screen.active { display: flex; }
+h1 { font-size: 24px; font-weight: 500; text-align: center; }
+h2 { font-size: 20px; font-weight: 500; text-align: center; }
+p { font-size: 15px; color: #555; line-height: 1.7; text-align: center; max-width: 500px; }
+.card { background: #fff; border: 1px solid #e8e8e4; border-radius: 12px; padding: 1.5rem; width: 100%; }
+.btn { background: transparent; border: 1px solid #ccc; border-radius: 8px; padding: 11px 32px; font-size: 15px; font-weight: 500; cursor: pointer; color: #1a1a1a; transition: background 0.15s; font-family: inherit; }
+.btn:hover { background: #f0f0ee; }
+.btn:active { transform: scale(0.98); }
+.btn-primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+.btn-primary:hover { background: #333; }
+.word-display { font-size: 56px; font-weight: 500; text-align: center; min-height: 90px; display: flex; align-items: center; justify-content: center; letter-spacing: 3px; width: 100%; }
+.question-label { font-size: 14px; color: #888; text-align: center; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; }
+.choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
+.choice-btn { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 16px; font-size: 16px; font-weight: 500; cursor: pointer; color: #1a1a1a; transition: background 0.1s, border-color 0.1s; font-family: inherit; text-transform: capitalize; }
+.choice-btn:hover { background: #f5f5f3; border-color: #bbb; }
+.choice-btn.correct { background: #eaf3de; border-color: #639922; color: #3b6d11; }
+.choice-btn.wrong { background: #fcebeb; border-color: #e24b4a; color: #a32d2d; }
+.choice-btn:disabled { cursor: default; }
+.progress-bar { width: 100%; height: 5px; background: #e8e8e4; border-radius: 3px; overflow: hidden; }
+.progress-fill { height: 100%; background: #1a1a1a; border-radius: 3px; transition: width 0.2s; }
+.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; }
+.stat-card { background: #f5f5f3; border-radius: 8px; padding: 1.2rem; text-align: center; }
+.stat-label { font-size: 12px; color: #888; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-value { font-size: 26px; font-weight: 500; }
+.round-badge { font-size: 13px; color: #888; background: #f0f0ee; border-radius: 20px; padding: 4px 16px; }
+.timer { font-size: 14px; color: #888; font-variant-numeric: tabular-nums; font-weight: 500; }
+.results-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.results-table th { text-align: left; padding: 8px 10px; font-weight: 500; border-bottom: 1px solid #e8e8e4; color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; }
+.results-table td { padding: 12px 10px; border-bottom: 1px solid #f0f0ee; }
+.results-table tr:last-child td { border-bottom: none; }
+.feedback { font-size: 14px; height: 22px; text-align: center; font-weight: 500; }
+.feedback.ok { color: #3b6d11; }
+.feedback.err { color: #a32d2d; }
+#participant-count { font-size: 13px; color: #aaa; }
+.top-bar { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+.saving-msg { font-size: 13px; color: #aaa; text-align: center; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Welcome -->
+  <div class="screen active" id="screen-welcome">
+    <h1>Stroop Task Experiment</h1>
+    <p>A short cognitive experiment studying how the brain handles conflicting information. You'll complete 3 rounds of 30 trials each. Read the instructions at the start of each round carefully.</p>
+    <div class="card" style="display:flex; flex-direction:column; gap:10px;">
+      <div style="font-size:14px; font-weight:500; margin-bottom:2px;">What to expect</div>
+      <div style="font-size:14px; color:#666;">• 3 rounds × 30 trials = 90 total responses</div>
+      <div style="font-size:14px; color:#666;">• Each round has different instructions — read them carefully</div>
+      <div style="font-size:14px; color:#666;">• Your response time and accuracy are recorded anonymously</div>
+      <div style="font-size:14px; color:#666;">• Takes approximately 5–10 minutes to complete</div>
+    </div>
+    <div id="participant-count"></div>
+    <button class="btn btn-primary" onclick="startExperiment()">Start experiment</button>
+  </div>
+
+  <!-- Round Intro -->
+  <div class="screen" id="screen-round-intro">
+    <div class="round-badge" id="intro-badge"></div>
+    <h2 id="intro-title"></h2>
+    <div class="card">
+      <p id="intro-desc" style="text-align:left; color:#333; max-width:100%;"></p>
+    </div>
+    <p style="font-size:13px; color:#aaa;">Example:</p>
+    <div class="word-display" id="intro-example-word"></div>
+    <p id="intro-example-answer" style="font-size:13px;"></p>
+    <button class="btn btn-primary" onclick="startRound()">Begin round</button>
+  </div>
+
+  <!-- Trial -->
+  <div class="screen" id="screen-trial">
+    <div class="top-bar">
+      <div class="round-badge" id="trial-badge"></div>
+      <div class="timer" id="trial-timer">0.0s</div>
+      <div style="font-size:13px; color:#888;" id="trial-counter"></div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+    <div class="question-label" id="trial-question"></div>
+    <div class="word-display" id="trial-word"></div>
+    <div class="feedback" id="trial-feedback"></div>
+    <div class="choices" id="trial-choices"></div>
+  </div>
+
+  <!-- Round Summary -->
+  <div class="screen" id="screen-round-summary">
+    <div class="round-badge" id="summary-badge"></div>
+    <h2>Round complete</h2>
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">Time</div><div class="stat-value" id="s-time"></div></div>
+      <div class="stat-card"><div class="stat-label">Correct</div><div class="stat-value" id="s-correct" style="color:#3b6d11"></div></div>
+      <div class="stat-card"><div class="stat-label">Wrong</div><div class="stat-value" id="s-wrong" style="color:#a32d2d"></div></div>
+    </div>
+    <button class="btn btn-primary" id="summary-next-btn" onclick="nextRound()">Continue</button>
+  </div>
+
+  <!-- Final Results -->
+  <div class="screen" id="screen-final">
+    <h1>Experiment complete</h1>
+    <p>Thank you for participating! Here are your results across all three rounds.</p>
+    <div class="card">
+      <table class="results-table">
+        <thead>
+          <tr><th>Round</th><th>Condition</th><th>Task</th><th>Time</th><th>Correct</th><th>Wrong</th><th>Accuracy</th></tr>
+        </thead>
+        <tbody id="final-table-body"></tbody>
+      </table>
+    </div>
+    <div class="saving-msg" id="saving-msg">Saving your results...</div>
+    <p style="font-size:13px;">Your results have been saved anonymously for research purposes.</p>
+  </div>
+
+</div>
+<script>
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyAhV7cgGVZ5WO739MtCJATbwuz7qB4qlI3hKxWP2sOhZX5yF1PdpKeZG1YSDo_0at6SQ/exec';
+
+const COLORS = ['red','blue','green','yellow','purple'];
+const COLOR_CSS = { red:'#E24B4A', blue:'#378ADD', green:'#4a9e2f', yellow:'#c9900a', purple:'#7F77DD' };
+
+const ROUND_DEFS = [
+  { type:'congruent',   task:'color', label:'Round A', name:'Congruent — identify the color',
+    desc:'The word and its color will match. Select the color the word is written in.\n\nExample below: the word "GREEN" is written in green ink — the correct answer is green.' },
+  { type:'incon-word',  task:'word',  label:'Round B', name:'Incongruent — identify the word',
+    desc:'The word and its color will NOT match. Select the word itself — ignore the color it is written in.\n\nExample below: the word "GREEN" is written in blue ink — the correct answer is green (the word).' },
+  { type:'incon-color', task:'color', label:'Round C', name:'Incongruent — identify the color',
+    desc:'The word and its color will NOT match. Select the color the word is written in — ignore the word itself.\n\nExample below: the word "GREEN" is written in blue ink — the correct answer is blue (the ink color).' },
+];
+
+let roundOrder = [];
+let currentRoundIdx = 0;
+let trials = [];
+let trialIdx = 0;
+let roundResults = [];
+let roundStartTime = 0;
+let trialStartTime = 0;
+let timerInterval = null;
+let canAnswer = true;
+let participantId = 'P_' + Math.random().toString(36).substr(2,9) + '_' + Date.now();
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i=a.length-1; i>0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+function generateTrials(type) {
+  const list = [];
+  for (let i=0; i<30; i++) {
+    const word = COLORS[i % COLORS.length];
+    let color;
+    if (type==='congruent') {
+      color = word;
+    } else {
+      const others = COLORS.filter(c=>c!==word);
+      color = others[i % others.length];
+    }
+    list.push({word, color});
+  }
+  return shuffle(list);
+}
+
+function getChoices(trial, task) {
+  const correct = task==='color' ? trial.color : trial.word;
+  const distractors = shuffle(COLORS.filter(c=>c!==correct)).slice(0,3);
+  return shuffle([correct, ...distractors]);
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function startExperiment() {
+  roundOrder = shuffle([0,1,2]);
+  currentRoundIdx = 0;
+  roundResults = [];
+  showRoundIntro();
+}
+
+function showRoundIntro() {
+  const def = ROUND_DEFS[roundOrder[currentRoundIdx]];
+  document.getElementById('intro-badge').textContent = `Round ${currentRoundIdx+1} of 3 — ${def.label}`;
+  document.getElementById('intro-title').textContent = def.name;
+  document.getElementById('intro-desc').innerText = def.desc;
+
+  const ew = document.getElementById('intro-example-word');
+  if (def.type==='congruent') {
+    ew.textContent = 'GREEN'; ew.style.color = COLOR_CSS['green'];
+    document.getElementById('intro-example-answer').textContent = 'Correct answer: green';
+  } else if (def.type==='incon-word') {
+    ew.textContent = 'GREEN'; ew.style.color = COLOR_CSS['blue'];
+    document.getElementById('intro-example-answer').textContent = 'Correct answer: green (the word, not the ink color)';
+  } else {
+    ew.textContent = 'GREEN'; ew.style.color = COLOR_CSS['blue'];
+    document.getElementById('intro-example-answer').textContent = 'Correct answer: blue (the ink color, not the word)';
+  }
+  showScreen('screen-round-intro');
+}
+
+function startRound() {
+  const def = ROUND_DEFS[roundOrder[currentRoundIdx]];
+  trials = generateTrials(def.type);
+  trialIdx = 0;
+  roundStartTime = Date.now();
+  document.getElementById('trial-badge').textContent = `Round ${currentRoundIdx+1} of 3 — ${def.label}`;
+  document.getElementById('trial-question').textContent = def.task==='color' ? '▸ Select the ink COLOR' : '▸ Select the WORD';
+  showScreen('screen-trial');
+  startTimer();
+  showTrial();
+}
+
+function startTimer() {
+  clearInterval(timerInterval);
+  timerInterval = setInterval(()=>{
+    const elapsed = (Date.now()-roundStartTime)/1000;
+    document.getElementById('trial-timer').textContent = elapsed.toFixed(1)+'s';
+  }, 100);
+}
+
+function showTrial() {
+  if (trialIdx >= trials.length) { endRound(); return; }
+  canAnswer = true;
+  const trial = trials[trialIdx];
+  const pct = (trialIdx/30)*100;
+  document.getElementById('progress-fill').style.width = pct+'%';
+  document.getElementById('trial-counter').textContent = (trialIdx+1)+' / 30';
+
+  const wd = document.getElementById('trial-word');
+  wd.textContent = trial.word.toUpperCase();
+  wd.style.color = COLOR_CSS[trial.color];
+
+  document.getElementById('trial-feedback').textContent = '';
+  document.getElementById('trial-feedback').className = 'feedback';
+
+  const def = ROUND_DEFS[roundOrder[currentRoundIdx]];
+  const choices = getChoices(trial, def.task);
+  const container = document.getElementById('trial-choices');
+  container.innerHTML = '';
+  const correct = def.task==='color' ? trial.color : trial.word;
+
+  choices.forEach(ch => {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.textContent = ch;
+    btn.onclick = () => handleAnswer(ch, correct, btn);
+    container.appendChild(btn);
+  });
+  trialStartTime = Date.now();
+}
+
+function handleAnswer(chosen, correct, btn) {
+  if (!canAnswer) return;
+  canAnswer = false;
+  const rt = Date.now()-trialStartTime;
+  const isCorrect = chosen===correct;
+  const fb = document.getElementById('trial-feedback');
+
+  document.querySelectorAll('.choice-btn').forEach(b=>b.disabled=true);
+
+  if (isCorrect) {
+    btn.classList.add('correct');
+    fb.textContent = '✓ Correct';
+    fb.className = 'feedback ok';
+  } else {
+    btn.classList.add('wrong');
+    fb.textContent = '✗ Incorrect';
+    fb.className = 'feedback err';
+    document.querySelectorAll('.choice-btn').forEach(b=>{
+      if (b.textContent===correct) b.classList.add('correct');
+    });
+  }
+
+  trials[trialIdx]._correct = isCorrect;
+  trials[trialIdx]._rt = rt;
+  trialIdx++;
+  setTimeout(showTrial, 600);
+}
+
+function endRound() {
+  clearInterval(timerInterval);
+  const totalTime = (Date.now()-roundStartTime)/1000;
+  const correct = trials.filter(t=>t._correct).length;
+  const wrong = 30-correct;
+  const def = ROUND_DEFS[roundOrder[currentRoundIdx]];
+
+  roundResults.push({
+    roundNum: currentRoundIdx+1,
+    roundLabel: def.label,
+    type: def.type,
+    task: def.task,
+    time: totalTime,
+    correct, wrong,
+    trialData: trials.map(t=>({word:t.word, color:t.color, correct:t._correct, rt:t._rt}))
+  });
+
+  document.getElementById('summary-badge').textContent = `Round ${currentRoundIdx+1} complete — ${def.label}`;
+  document.getElementById('s-time').textContent = totalTime.toFixed(1)+'s';
+  document.getElementById('s-correct').textContent = correct;
+  document.getElementById('s-wrong').textContent = wrong;
+  document.getElementById('summary-next-btn').textContent = currentRoundIdx < 2 ? 'Continue to next round' : 'See final results';
+  showScreen('screen-round-summary');
+}
+
+function nextRound() {
+  currentRoundIdx++;
+  if (currentRoundIdx < 3) {
+    showRoundIntro();
+  } else {
+    showFinalResults();
+  }
+}
+
+function showFinalResults() {
+  const tbody = document.getElementById('final-table-body');
+  tbody.innerHTML = '';
+  const typeLabels = { congruent:'Congruent', 'incon-word':'Incongruent', 'incon-color':'Incongruent' };
+  const taskLabels = { color:'Identify color', word:'Identify word' };
+
+  roundResults.forEach(r=>{
+    const acc = ((r.correct/30)*100).toFixed(0);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${r.roundNum}</td><td>${typeLabels[r.type]}</td><td>${taskLabels[r.task]}</td><td>${r.time.toFixed(1)}s</td><td style="color:#3b6d11;font-weight:500">${r.correct}</td><td style="color:#a32d2d;font-weight:500">${r.wrong}</td><td>${acc}%</td>`;
+    tbody.appendChild(tr);
+  });
+
+  showScreen('screen-final');
+  saveToSheets();
+}
+
+function saveToSheets() {
+  const savingMsg = document.getElementById('saving-msg');
+  savingMsg.textContent = 'Saving your results...';
+
+  const payload = {
+    participantId,
+    timestamp: new Date().toISOString(),
+    roundOrder: roundOrder.map(i=>ROUND_DEFS[i].type),
+    rounds: roundResults.map(r=>({
+      roundNum: r.roundNum,
+      roundLabel: r.roundLabel,
+      type: r.type,
+      task: r.task,
+      timeSeconds: parseFloat(r.time.toFixed(2)),
+      correct: r.correct,
+      wrong: r.wrong,
+      accuracy: parseFloat((r.correct/30*100).toFixed(1)),
+      avgRtMs: parseFloat((r.trialData.reduce((s,t)=>s+t.rt,0)/30).toFixed(0))
+    }))
+  };
+
+  fetch(SCRIPT_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).then(()=>{
+    savingMsg.textContent = '✓ Results saved successfully.';
+  }).catch(()=>{
+    savingMsg.textContent = 'Could not save results — please check your connection.';
+  });
+}
+</script>
+</body>
+</html>
